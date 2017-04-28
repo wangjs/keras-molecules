@@ -4,6 +4,7 @@ import argparse
 import os
 import h5py
 import numpy as np
+from keras.utils import plot_model
 
 
 NUM_EPOCHS = 1
@@ -24,19 +25,25 @@ def get_arguments():
                         help='Number of samples to process per minibatch during training.')
     parser.add_argument('--random_seed', type=int, metavar='N', default=RANDOM_SEED,
                         help='Seed to use to start randomizer for shuffling.')
+    parser.add_argument('--simple', dest='simple', action='store_true', help='Use simple model.')
     return parser.parse_args()
 
 def main():
     args = get_arguments()
     np.random.seed(args.random_seed)
 
-    from molecules.model import MoleculeVAE
+    from molecules.model import MoleculeVAE, SimpleMoleculeVAE
     from molecules.utils import one_hot_array, one_hot_index, from_one_hot_array, \
         decode_smiles_from_indexes, load_dataset
     from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
 
     data_train, data_test, charset = load_dataset(args.data)
-    model = MoleculeVAE()
+
+    if args.simple:
+        model = SimpleMoleculeVAE()
+    else:
+        model = MoleculeVAE()
+
     if os.path.isfile(args.model):
         model.load(charset, args.model, latent_rep_size = args.latent_dim)
     else:
@@ -51,6 +58,8 @@ def main():
                                   patience = 3,
                                   min_lr = 0.0001)
 
+
+    # plot_model(model, to_file='model.png')
     model.autoencoder.fit(
         data_train,
         data_train,
