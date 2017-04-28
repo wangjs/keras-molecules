@@ -5,6 +5,7 @@ import os
 import h5py
 import numpy as np
 from keras.utils import plot_model
+import cPickle
 
 
 NUM_EPOCHS = 1
@@ -60,7 +61,7 @@ def main():
 
 
     # plot_model(model, to_file='model.png')
-    model.autoencoder.fit(
+    history = model.autoencoder.fit(
         data_train,
         data_train,
         shuffle = True,
@@ -69,6 +70,8 @@ def main():
         callbacks = [checkpointer, reduce_lr],
         validation_data = (data_test, data_test)
     )
+    with open('history.p', 'wb') as f:
+        cPickle.dump(history.history, f)
 
 if __name__ == '__main__':
     main()
