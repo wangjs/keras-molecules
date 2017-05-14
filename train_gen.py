@@ -5,8 +5,10 @@ import os
 import h5py
 import numpy as np
 import pandas as pd
+import tensorflow as tf
+from keras import backend as K
 
-from molecules.vectorizer import SmilesDataGenerator
+from molecules.vectorizer import SmilesDataGenerator, CanonicalSmilesDataGenerator
 
 NUM_EPOCHS = 1
 EPOCH_SIZE = 500000
@@ -15,6 +17,7 @@ LATENT_DIM = 292
 MAX_LEN = 120
 TEST_SPLIT = 0.20
 RANDOM_SEED = 1337
+NUM_CORES = -1
 
 def get_arguments():
     parser = argparse.ArgumentParser(description='Molecular autoencoder network')
@@ -33,15 +36,25 @@ def get_arguments():
                         help='Fraction of dataset to use as test data, rest is training data.')
     parser.add_argument('--random_seed', type=int, metavar='N', default=RANDOM_SEED,
                         help='Seed to use to start randomizer for shuffling.')
+    parser.add_argument('--simple', dest='simple', action='store_true', help='Use simple model.')
+    parser.add_argument('--num_cores', type=int, metavar='N', default=NUM_CORES,
+                        help='Number of CPU cores for TensorFlow. If -1 then uses all.')
     return parser.parse_args()
 
 def main():
     args = get_arguments()
     np.random.seed(args.random_seed)
-    
-    from molecules.model import MoleculeVAE
+
+    from molecules.model import MoleculeVAE, SimpleMoleculeVAE
     from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
-    
+
+    if args.num_cores != -1:
+        print('num_cores = ' + str(args.num_cores))
+        config = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1, \
+                                allow_soft_placement=True, device_count = {'CPU': args.num_cores})
+        session = tf.Session(config=config)
+        K.set_session(session)
+
     data = pd.read_hdf(args.data, 'table')
     structures = data['structure']
 
@@ -50,7 +63,7 @@ def main():
     # structures = [line.split()[0].strip() for line in gzip.open(filepath) if line]
 
     # can also use CanonicalSmilesDataGenerator
-    datobj = SmilesDataGenerator(structures, MAX_LEN,
+    datobj = CanonicalSmilesDataGenerator(structures, MAX_LEN,
                                  test_split=args.test_split,
                                  random_seed=args.random_seed)
     test_divisor = int((1 - datobj.test_split) / (datobj.test_split))
@@ -61,7 +74,11 @@ def main():
     train_gen = ((tens, tens) for (tens, _, weights) in train_gen)
     test_gen = ((tens, tens) for (tens, _, weights) in test_gen)
 
-    model = MoleculeVAE()
+    if args.simple:
+        model = SimpleMoleculeVAE()
+    else:
+        model = MoleculeVAE()
+
     if os.path.isfile(args.model):
         model.load(datobj.chars, args.model, latent_rep_size = args.latent_dim)
     else:
@@ -76,7 +93,7 @@ def main():
                                   patience = 3,
                                   min_lr = 0.0001)
 
-    model.autoencoder.fit_generator(
+    history = model.autoencoder.fit_generator(
         train_gen,
         args.epoch_size,
         nb_epoch = args.epochs,
@@ -85,6 +102,8 @@ def main():
         nb_val_samples = args.epoch_size / test_divisor,
         pickle_safe = True
     )
+    with open('history.p', 'wb') as f:
+        cPickle.dump(history.history, f)
 
 if __name__ == '__main__':
     main()
