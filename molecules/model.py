@@ -100,7 +100,7 @@ class SimpleMoleculeVAE(MoleculeVAE):
     def _buildEncoder(self, x, latent_rep_size, max_length, epsilon_std = 1.0):
 
         print 'Creating encoder for Simple Molecule VAE'
-        h = LSTM(64, name='lstm_1')(x)
+        h = LSTM(latent_rep_size, name='lstm_1')(x)
 
         def sampling(args):
             z_mean_, z_log_var_ = args
@@ -125,6 +125,6 @@ class SimpleMoleculeVAE(MoleculeVAE):
         print 'Creating decoder for Simple Molecule VAE'
         h = Dense(latent_rep_size, name='latent_input', activation = 'relu')(z)
         h = RepeatVector(max_length, name='repeat_vector')(h)
-        h = LSTM(64, name='lstm_2', return_sequences = True)(h)
+        h = LSTM(latent_rep_size, name='lstm_2', return_sequences = True)(h)
 
         return TimeDistributed(Dense(charset_length, activation='softmax'), name='decoded_mean')(h)
