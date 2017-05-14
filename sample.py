@@ -6,7 +6,7 @@ import h5py
 import numpy as np
 import sys
 
-from molecules.model import MoleculeVAE
+from molecules.model import MoleculeVAE, SimpleMoleculeVAE
 from molecules.utils import one_hot_array, one_hot_index, from_one_hot_array, \
     decode_smiles_from_indexes, load_dataset
 
@@ -28,6 +28,7 @@ def get_arguments():
     parser.add_argument('--latent_dim', type=int, metavar='N', default=LATENT_DIM,
                         help='Dimensionality of the latent representation.')
     parser.add_argument('--pos', type=int)
+    parser.add_argument('--simple', dest='simple', action='store_true', help='Use simple model.')
     return parser.parse_args()
 
 def read_latent_data(filename):
@@ -86,7 +87,10 @@ def encoder(args, model):
 
 def main():
     args = get_arguments()
-    model = MoleculeVAE()
+    if args.simple:
+        model = SimpleMoleculeVAE()
+    else:
+        model = MoleculeVAE()
 
     if args.target == 'autoencoder':
         autoencoder(args, model)
