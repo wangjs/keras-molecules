@@ -6,12 +6,15 @@ import h5py
 import numpy as np
 from keras.utils import plot_model
 import cPickle
+import tensorflow as tf
+from keras import backend as K
 
 
 NUM_EPOCHS = 1
 BATCH_SIZE = 600
 LATENT_DIM = 292
 RANDOM_SEED = 1337
+NUM_CORES = -1
 
 def get_arguments():
     parser = argparse.ArgumentParser(description='Molecular autoencoder network')
@@ -27,6 +30,8 @@ def get_arguments():
     parser.add_argument('--random_seed', type=int, metavar='N', default=RANDOM_SEED,
                         help='Seed to use to start randomizer for shuffling.')
     parser.add_argument('--simple', dest='simple', action='store_true', help='Use simple model.')
+    parser.add_argument('--num_cores', type=int, metavar='N', default=NUM_CORES,
+                        help='Number of CPU cores for TensorFlow. If -1 then uses all.')
     return parser.parse_args()
 
 def main():
@@ -37,6 +42,12 @@ def main():
     from molecules.utils import one_hot_array, one_hot_index, from_one_hot_array, \
         decode_smiles_from_indexes, load_dataset
     from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
+
+    if args.num_cores != -1:
+        config = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1, \
+                                allow_soft_placement=True, device_count = {'CPU': args.num_cores})
+        session = tf.Session(config=config)
+        K.set_session(session)
 
     data_train, data_test, charset = load_dataset(args.data)
 
