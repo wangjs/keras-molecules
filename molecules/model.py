@@ -8,6 +8,7 @@ from keras.layers import LSTM, Dropout
 from keras.layers.wrappers import TimeDistributed
 from keras.layers.recurrent import GRU
 from keras.layers.convolutional import Convolution1D
+from keras import optimizers
 
 class MoleculeVAE():
 
@@ -52,11 +53,16 @@ class MoleculeVAE():
             self.encoder.load_weights(weights_file, by_name = True)
             self.decoder.load_weights(weights_file, by_name = True)
 
-        self.autoencoder.compile(optimizer = 'Adam',
+        # sgd = optimizers.SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+        # self.autoencoder.compile(optimizer = sgd,
+        #                          loss = vae_loss,
+        #                          metrics = ['accuracy'])
+
+        self.autoencoder.compile(optimizer = 'adam',
                                  loss = vae_loss,
                                  metrics = ['accuracy'])
 
-    def _buildEncoder(self, x, latent_rep_size, max_length, epsilon_std = 1.0):
+    def _buildEncoder(self, x, latent_rep_size, max_length, epsilon_std = 0.01):
         h = Convolution1D(9, 9, activation = 'relu', name='conv_1')(x)
         h = Convolution1D(9, 9, activation = 'relu', name='conv_2')(h)
         h = Convolution1D(10, 11, activation = 'relu', name='conv_3')(h)
@@ -97,10 +103,11 @@ class MoleculeVAE():
 
 class SimpleMoleculeVAE(MoleculeVAE):
 
-    def _buildEncoder(self, x, latent_rep_size, max_length, epsilon_std = 1.0):
+    def _buildEncoder(self, x, latent_rep_size, max_length, epsilon_std = 0.01):
 
-        print 'Creating encoder for Simple Molecule VAE'
-        h = LSTM(latent_rep_size, name='lstm_1')(x)
+        h = LSTM(latent_rep_size, return_sequences = True)(x)
+        h = Flatten(name='flatten_1')(h)
+        h = Dense(latent_rep_size, activation = 'relu', name='dense_1')(h)
 
         def sampling(args):
             z_mean_, z_log_var_ = args
@@ -122,9 +129,8 @@ class SimpleMoleculeVAE(MoleculeVAE):
 
     def _buildDecoder(self, z, latent_rep_size, max_length, charset_length):
 
-        print 'Creating decoder for Simple Molecule VAE'
         h = Dense(latent_rep_size, name='latent_input', activation = 'relu')(z)
         h = RepeatVector(max_length, name='repeat_vector')(h)
-        h = LSTM(latent_rep_size, name='lstm_2', return_sequences = True)(h)
+        h = LSTM(latent_rep_size, return_sequences = True)(h)
 
         return TimeDistributed(Dense(charset_length, activation='softmax'), name='decoded_mean')(h)
